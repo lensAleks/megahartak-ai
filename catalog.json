@@ -1,0 +1,38 @@
+[
+  {
+    "id": "12345",
+    "title": "Nike Air Zoom Pegasus 40",
+    "brand": "Nike",
+    "category": "sport_shoes",
+    "gender": "male",
+    "age_group": "adult",
+    "price": 49900,
+    "currency": "AMD",
+    "size": [
+      "40",
+      "41",
+      "42"
+    ],
+    "color": "black",
+    "seller": "BBay",
+    "url": "https://megahartak.am/example-item-12345"
+  },
+  {
+    "id": "67890",
+    "title": "Adidas Kids Running Shoes",
+    "brand": "Adidas",
+    "category": "sport_shoes",
+    "gender": "unisex",
+    "age_group": "kids",
+    "price": 35900,
+    "currency": "AMD",
+    "size": [
+      "33",
+      "34",
+      "35"
+    ],
+    "color": "blue",
+    "seller": "BBay",
+    "url": "https://megahartak.am/example-item-67890"
+  }
+]
