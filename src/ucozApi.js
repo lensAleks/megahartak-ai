@@ -29,15 +29,22 @@ export async function fetchGoodsPage({ pageNum = 1, perPage = 20 } = {}) {
   const requestData = { url: url.toString(), method: "GET" };
   const headers = oauth.toHeader(oauth.authorize(requestData, token));
 
-  const response = await fetch(requestData.url, {
+    const response = await fetch(requestData.url, {
     method: "GET",
     headers,
   });
 
+  const text = await response.text();
+
   if (!response.ok) {
-    throw new Error("uAPI error " + response.status);
+    // вернём статус и текст, чтобы понять, что не нравится uAPI
+    throw new Error(`uAPI error ${response.status}: ${text}`);
   }
 
-  const data = await response.json();
-  return data;
+  // если всё ок, парсим как JSON
+  return JSON.parse(text);
 }
+
+
+
+
