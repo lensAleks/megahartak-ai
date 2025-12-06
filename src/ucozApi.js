@@ -20,7 +20,7 @@ const token = {
 };
 
 export async function fetchGoodsPage({ pageNum = 1, perPage = 20 } = {}) {
-  const url = new URL(`${process.env.UCOZ_DOMAIN}/uapi/shop/goods`);
+  const url = new URL(`${process.env.UCOZ_DOMAIN}/uapi/shop/request`);
   url.searchParams.set("page", "allgoods");
   url.searchParams.set("format", "json");
   url.searchParams.set("p", String(pageNum));
