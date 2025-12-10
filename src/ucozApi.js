@@ -6,6 +6,9 @@ import fetchModule from 'node-fetch';
 // node-fetch@2 в ESM даёт объект с .default
 const fetch = fetchModule.default || fetchModule;
 
+
+console.log("🔥 Loaded NEW ucozApi.js — version 2");
+
 // Инициализируем OAuth 1.0a с твоими ключами из env
 const oauth = new OAuth({
   consumer: {
