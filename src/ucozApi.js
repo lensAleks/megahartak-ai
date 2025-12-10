@@ -1,61 +1,96 @@
 // src/ucozApi.js
-import OAuth from "oauth-1.0a";
-import crypto from "crypto";
-import fetch from "node-fetch";
+import OAuth from 'oauth-1.0a';
+import crypto from 'crypto';
+import fetchModule from 'node-fetch';
 
-// Настраиваем OAuth 1.0a (как требует uAPI)
-const oauth = OAuth({
+// node-fetch@2 в ESM даёт объект с .default
+const fetch = fetchModule.default || fetchModule;
+
+// Инициализируем OAuth 1.0a с твоими ключами из env
+const oauth = new OAuth({
   consumer: {
     key: process.env.UCOZ_CONSUMER_KEY,
     secret: process.env.UCOZ_CONSUMER_SECRET,
   },
-  signature_method: "HMAC-SHA1",
+  signature_method: 'HMAC-SHA1',
   hash_function(baseString, key) {
-    return crypto.createHmac("sha1", key).update(baseString).digest("base64");
+    return crypto.createHmac('sha1', key).update(baseString).digest('base64');
   },
 });
 
-// Токен, который ты создала в uAPI
+// Токен из env
 const token = {
   key: process.env.UCOZ_TOKEN,
   secret: process.env.UCOZ_TOKEN_SECRET,
 };
 
-/**
- * Загружает страницу товаров из uCoz-магазина.
- * page=allgoods — список всех товаров, пейджинг через pnum.
- */
-export async function fetchGoodsPage({ pageNum = 1 } = {}) {
-  // 1. Сначала собираем URL с бизнес-параметрами (page/pnum/format)
-  const url = new URL(`${process.env.UCOZ_DOMAIN}/uapi/shop/request`);
-  url.searchParams.set("page", "allgoods");
-  url.searchParams.set("pnum", String(pageNum));
-  url.searchParams.set("format", "json");
+// Домен uCoz из env, без хвостового /
+const UCOZ_DOMAIN = (process.env.UCOZ_DOMAIN || '').replace(/\/+$/, '');
 
-  // 2. Данные для подписи — уже с page/pnum внутри
-  const requestData = {
-    url: url.toString(),
-    method: "GET",
+function buildUrlWithParams(baseUrl, params) {
+  const usp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      usp.append(key, String(value));
+    }
+  }
+  return `${baseUrl}?${usp.toString()}`;
+}
+
+/**
+ * Получение страницы товаров из uCoz uAPI
+ *
+ * @param {Object} options
+ * @param {string} options.page  - страница uAPI (по умолчанию allgoods)
+ * @param {number} options.pnum  - номер страницы (1..N)
+ * @param {number} options.rows  - кол-во товаров на страницу
+ */
+export async function fetchGoodsPage({ page = 'allgoods', pnum = 1, rows = 20 } = {}) {
+  if (!UCOZ_DOMAIN) {
+    throw new Error('UCOZ_DOMAIN env var is not set');
+  }
+
+  const baseUrl = `${UCOZ_DOMAIN}/uapi/shop/request`;
+
+  // Параметры самого метода uAPI
+  const params = {
+    page,
+    pnum,
+    rows,
+    format: 'json', // чтобы вернуть JSON
   };
 
-  // 3. Считаем oauth_* с учётом этих параметров
+  // Данные для расчёта подписи
+  const requestData = {
+    url: baseUrl,
+    method: 'GET',
+    data: params,
+  };
+
+  // oauth_* параметры (nonce, timestamp и т.д.)
   const oauthParams = oauth.authorize(requestData, token);
 
-  // 4. Кладём oauth_* в query string (классический OAuth 1.0),
-  //    а НЕ в заголовок Authorization — именно этого хочет uAPI
-  for (const [key, value] of Object.entries(oauthParams)) {
-    url.searchParams.set(key, value);
+  // ВСЕ параметры, которые должны попасть в query и в подпись
+  const allParams = { ...params, ...oauthParams };
+
+  // Формируем финальный URL: /uapi/shop/request?page=allgoods&...&oauth_...
+  const finalUrl = buildUrlWithParams(baseUrl, allParams);
+
+  console.log('🔗 uAPI URL:', finalUrl);
+
+  const res = await fetch(finalUrl);
+  const text = await res.text();
+
+  if (!res.ok) {
+    console.error('uAPI error body:', text);
+    throw new Error(`uAPI error ${res.status}: ${text}`);
   }
 
-  // 5. Отправляем запрос без Authorization header
-  const response = await fetch(url.toString(), { method: "GET" });
-  const text = await response.text();
-
-  if (!response.ok) {
-    console.error("uAPI raw response:", text);
-    throw new Error(`uAPI error ${response.status}: ${text}`);
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(
+      `Failed to parse uAPI response as JSON: ${e.message}. Raw response: ${text}`
+    );
   }
-
-  // uAPI возвращает JSON
-  return JSON.parse(text);
 }
