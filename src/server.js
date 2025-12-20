@@ -59,6 +59,51 @@ app.get("/api/ucoz/allgoods", async (req, res) => {
   }
 });
 
+// server.js
+app.get("/api/search", async (req, res) => {
+  try {
+    const q = String(req.query.q || "").toLowerCase();
+    const limit = Number(req.query.limit || 5);
+
+    if (!q) {
+      return res.status(400).json({ error: "q is required" });
+    }
+
+    // 1. Берём товары
+    const r = await fetch("https://megahartak.am/php/goods-api.php?rows=200&pnum=1");
+    const data = await r.json();
+
+    const list = data?.success?.goods_list || [];
+    
+    // 2. Фильтруем
+    const results = list.filter(item => {
+      const title = (item.entry_title || "").toLowerCase();
+      const brief = (item.entry_brief || "").toLowerCase();
+      const brand = (item.entry_brand || "").toLowerCase();
+
+      return (
+        title.includes(q) ||
+        brief.includes(q) ||
+        brand.includes(q)
+      );
+    }).slice(0, limit);
+
+    res.json({
+      query: q,
+      count: results.length,
+      items: results.map(i => ({
+        title: i.entry_title,
+        price: i.entry_price?.price,
+        url: i.entry_shop_url,
+        image: i.entry_photo?.photo
+      }))
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 
 // Твой AI-ассистент (как было)
