@@ -73,7 +73,9 @@ app.get("/api/search", async (req, res) => {
     const r = await fetch("https://megahartak.am/php/goods-api.php?rows=200&pnum=1");
     const data = await r.json();
 
-    const list = data?.success?.goods_list || [];
+   // const list = data?.success?.goods_list || [];
+    const rawList = data?.success?.goods_list || {};
+    const list = Array.isArray(rawList) ? rawList : Object.values(rawList);
     
     // 2. Фильтруем
     const results = list.filter(item => {
