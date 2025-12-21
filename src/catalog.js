@@ -3,15 +3,14 @@ import fetchModule from "node-fetch";
 
 const fetch = fetchModule.default || fetchModule;
 
-// URL до catalog.json из GitHub Releases
 const CATALOG_URL = process.env.CATALOG_URL;
 
-let catalogData = null;
+let catalogRows = null;
 let loadingPromise = null;
 
-// Один раз загружаем и парсим JSON
-async function loadCatalogOnce() {
-  if (catalogData) return catalogData;
+// Один раз загружаем и держим весь JSON в памяти
+export async function loadCatalogOnce() {
+  if (catalogRows) return catalogRows;
   if (loadingPromise) return loadingPromise;
 
   if (!CATALOG_URL) {
@@ -19,7 +18,7 @@ async function loadCatalogOnce() {
   }
 
   loadingPromise = (async () => {
-    console.log("📥 Загрузка catalog.json из:", CATALOG_URL);
+    console.log("📬 Загрузка catalog.json из:", CATALOG_URL);
 
     const res = await fetch(CATALOG_URL);
     if (!res.ok) {
@@ -32,77 +31,72 @@ async function loadCatalogOnce() {
       );
     }
 
-    // Тут уже JSON, а не XLSX
     const rows = await res.json();
-
     console.log("📑 Строк в JSON:", rows.length);
 
-    // rows — это как раз то, что ты сохранила из convert-xlsx.js
-    catalogData = rows.map((row) => ({
-      entry_title:
-        row["Product name"] ||
-        row["Name"] ||
-        row["Нименование"] ||
-        "",
-
-      entry_brand:
-        row["Brand"] ||
-        row["Бренд"] ||
-        "",
-
-      entry_brief:
-        row["Short description"] ||
-        row["Description"] ||
-        row["Описание"] ||
-        "",
-
-      entry_price: {
-        price:
-          row["Price"] ||
-          row["Retail price"] ||
-          row["Цена"] ||
-          "",
-      },
-
-      entry_shop_url:
-        row["URL"] ||
-        row["Product URL"] ||
-        row["Link"] ||
-        "",
-
-      entry_photo: {
-        photo:
-          row["Image URL"] ||
-          row["Main image"] ||
-          row["Picture"] ||
-          "",
-      },
-    }));
-
-    console.log("✅ Каталог сформирован из JSON, товаров:", catalogData.length);
-
-    return catalogData;
+    catalogRows = rows;
+    return catalogRows;
   })();
 
   return loadingPromise;
 }
 
+/**
+ * Поиск по локальному каталогу
+ * @param {string} query - строка поиска, например "iphone" или "adidas"
+ * @param {number} limit - максимум результатов
+ */
 export async function searchCatalog(query, limit = 5) {
   const q = String(query || "").trim().toLowerCase();
   if (!q) return [];
 
-  const list = await loadCatalogOnce();
-
+  const rows = await loadCatalogOnce();
   const results = [];
-  for (const item of list) {
-    const title = (item.entry_title || "").toLowerCase();
-    const brand = (item.entry_brand || "").toLowerCase();
-    const brief = (item.entry_brief || "").toLowerCase();
 
-    if (title.includes(q) || brand.includes(q) || brief.includes(q)) {
-      results.push(item);
-      if (results.length >= limit) break;
-    }
+  for (const row of rows) {
+    // 1) Ищем по ВСЕМ полям строки
+    const haystack = Object.values(row)
+      .join(" ")
+      .toLowerCase();
+
+    if (!haystack.includes(q)) continue;
+
+    // 2) Красиво маппим в формат ассистента
+    const entry_title =
+      row["Интернет-магазин"] ||
+      row["Product name"] ||
+      row["Name"] ||
+      row["Наименование"] ||
+      "";
+
+    const entry_price =
+      row["__EMPTY"] ||
+      row["Price"] ||
+      row["Цена"] ||
+      "";
+
+    const entry_photo =
+      row["__EMPTY_1"] ||
+      row["Image URL"] ||
+      row["Picture"] ||
+      "";
+
+    const entry_shop_url =
+      row["__EMPTY_2"] ||
+      row["URL"] ||
+      row["Link"] ||
+      "";
+
+    results.push({
+      entry_title,
+      entry_brand: "", // бренда в этой выгрузке похоже нет
+      entry_brief: "", // описания тоже нет, можно будет добавить позже
+      entry_price: { price: entry_price },
+      entry_shop_url,
+      entry_photo: { photo: entry_photo },
+    });
+
+    if (results.length >= limit) break;
   }
 
   return results;
