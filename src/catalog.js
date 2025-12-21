@@ -1,43 +1,83 @@
-// src/catalog.js
-import fetch from "node-fetch";
+// src/server.js
+import express from "express";
+import cors from "cors";
+import { config } from "./config.js";
+import { askAssistant } from "./assistants.js";
+import { searchCatalog } from "./catalog.js"; // ✅ поиск по JSON с Google Drive
 
-let catalog = null; // кеш в памяти
+const app = express();
 
-export async function loadCatalog() {
-  if (catalog) return catalog; // уже загружено
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 
-  const url = process.env.CATALOG_URL;
-  if (!url) {
-    throw new Error("CATALOG_URL is not defined in environment variables");
+app.use(express.json());
+
+// Простой health-check
+app.get("/", (req, res) => {
+  res.json({ status: "ok", service: "megahartak-ai-backend" });
+});
+
+/**
+ * 🔎 Поиск по каталогу (catalog.json с Google Drive)
+ * GET /api/search?q=adidas&limit=5
+ */
+app.get("/api/search", async (req, res) => {
+  try {
+    const q = String(req.query.q || "").toLowerCase();
+    const limit = Number(req.query.limit || 5);
+
+    if (!q) {
+      return res.status(400).json({ error: "q is required" });
+    }
+
+    // 👉 searchCatalog сам внутри загрузит JSON с Google Drive (если ещё не загружен)
+    const results = await searchCatalog(q, limit);
+
+    res.json({
+      query: q,
+      count: results.length,
+      items: results.map((i) => ({
+        title: i.entry_title,
+        price: i.entry_price?.price,
+        url: i.entry_shop_url,
+        image: i.entry_photo?.photo,
+      })),
+    });
+  } catch (err) {
+    console.error("Search error:", err);
+    res.status(500).json({ error: err.message });
   }
+});
 
-  console.log("📥 Загружаю catalog.json из Google Drive...");
+/**
+ * 🤖 Ассистент (как было)
+ */
+app.post("/assistant", async (req, res) => {
+  try {
+    const { query } = req.body;
 
-  const response = await fetch(url);
-  const json = await response.json();
+    if (!query || typeof query !== "string") {
+      return res
+        .status(400)
+        .json({ error: "Field 'query' is required and must be a string." });
+    }
 
-  console.log("📦 Файл загружен. Количество товаров:", json.length);
+    console.log("👤 USER:", query);
 
-  catalog = json;
-  return json;
-}
+    const reply = await askAssistant(query);
 
-export async function searchCatalog(query, limit = 5) {
-  const q = query.toLowerCase();
+    console.log("🤖 BOT:", reply);
 
-  const list = await loadCatalog();
+    res.json({ reply });
+  } catch (err) {
+    console.error("Assistant error:", err);
+    res.status(500).json({ error: "AI server error" });
+  }
+});
 
-  const results = list.filter(item => {
-    const title = (item.entry_title || "").toLowerCase();
-    const brief = (item.entry_brief || "").toLowerCase();
-    const brand = (item.entry_brand || "").toLowerCase();
-
-    return (
-      title.includes(q) ||
-      brief.includes(q) ||
-      brand.includes(q)
-    );
-  });
-
-  return results.slice(0, limit);
-}
+app.listen(config.port, () => {
+  console.log(`🚀 Megahartak AI backend listening on port ${config.port}`);
+});
