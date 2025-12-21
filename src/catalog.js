@@ -1,45 +1,43 @@
-import fs from "fs";
+// src/catalog.js
+import fetch from "node-fetch";
 
-let catalog = [];
+let catalog = null; // кеш в памяти
 
-// Пробуем загрузить catalog.json из корня проекта
-try {
-  const raw = fs.readFileSync(new URL("../catalog.json", import.meta.url));
-  catalog = JSON.parse(raw.toString("utf8"));
-  console.log("✅ catalog.json loaded, items:", catalog.length);
-} catch (e) {
-  console.log("⚠ catalog.json not found or invalid. searchCatalog will return empty results.");
+export async function loadCatalog() {
+  if (catalog) return catalog; // уже загружено
+
+  const url = process.env.CATALOG_URL;
+  if (!url) {
+    throw new Error("CATALOG_URL is not defined in environment variables");
+  }
+
+  console.log("📥 Загружаю catalog.json из Google Drive...");
+
+  const response = await fetch(url);
+  const json = await response.json();
+
+  console.log("📦 Файл загружен. Количество товаров:", json.length);
+
+  catalog = json;
+  return json;
 }
 
-/**
- * Улучшенный поиск по каталогу.
- * Позже можно добавить фильтры по цене, возрасту, полу и т.д.
- */
-export function searchCatalog(query) {
-  if (!catalog.length) return [];
+export async function searchCatalog(query, limit = 5) {
+  const q = query.toLowerCase();
 
-  const q = query.toLowerCase().trim();
+  const list = await loadCatalog();
 
-  let results = catalog.filter((item) => {
-    const title = item.title?.toLowerCase() || "";
-    const brand = item.brand?.toLowerCase() || "";
-    const category = item.category?.toLowerCase() || "";
-    const keywords = (item.keywords || []).map(k => k.toLowerCase());
+  const results = list.filter(item => {
+    const title = (item.entry_title || "").toLowerCase();
+    const brief = (item.entry_brief || "").toLowerCase();
+    const brand = (item.entry_brand || "").toLowerCase();
 
     return (
       title.includes(q) ||
-      brand.includes(q) ||
-      category.includes(q) ||
-      keywords.some(k => k.includes(q))
+      brief.includes(q) ||
+      brand.includes(q)
     );
   });
 
-  // Возвращаем максимум 20 записей и только нужные поля
-  return results.slice(0, 20).map(item => ({
-    title: item.title || "",
-    brand: item.brand || "",
-    category: item.category || "",
-    price: item.price || "",
-    url: item.url || "",
-  }));
+  return results.slice(0, limit);
 }
