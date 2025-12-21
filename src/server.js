@@ -73,7 +73,7 @@ app.post("/assistant", async (req, res) => {
 
     res.json({
       reply: reply.text,
-      items: reply.items
+      items: reply.items || []
     });
   } catch (err) {
     console.error("Assistant error:", err);
