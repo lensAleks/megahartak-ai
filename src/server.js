@@ -72,7 +72,7 @@ app.post("/assistant", async (req, res) => {
     console.log("🤖 BOT:", reply);
 
     res.json({
-      reply: "",
+      //reply: "",
       items: reply.items || []
     });
   } catch (err) {
