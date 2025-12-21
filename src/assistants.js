@@ -54,6 +54,7 @@ export async function askAssistant(userQuery) {
     const toolOutputs = [];
 
     for (const call of toolCalls) {
+      console.log("🔧 TOOL CALL NAME:", call.function.name);
       if (call.function.name === "search_catalog") {
         const args = JSON.parse(call.function.arguments || "{}");
         const query = args.query || userQuery;
