@@ -73,15 +73,19 @@ export async function askAssistant(userQuery) {
     // 4. достаём финальное сообщение ассистента
     const messages = await client.beta.threads.messages.list(thread.id, { limit: 10 });
     const assistantMessage = messages.data.find((m) => m.role === "assistant");
-    const text = (assistantMessage?.content?.[0]?.text?.value || "").trim();
+    let text = (assistantMessage?.content?.[0]?.text?.value || "").trim();
 
-    const listIndex =
-    text.indexOf("1)") >= 0 ? text.indexOf("1)") :
-    text.indexOf("1.") >= 0 ? text.indexOf("1.") :
-    text.indexOf("•") >= 0 ? text.indexOf("•") : -1;
+     const markers = ["\n1)", "\n1.", "\n•", "\n-", "\n–", "\n—", "\n*"];
+     let listIndex = -1;
+
+    for (const m of markers) {
+      const idx = text.indexOf(m);
+      if (idx !== -1 && (listIndex === -1 || idx < listIndex)) {
+        listIndex = idx;
+      }
+    }
 
     if (listIndex > 0) {
-      // обрезаем всё после заголовка
       text = text.slice(0, listIndex).trim();
     }
 
