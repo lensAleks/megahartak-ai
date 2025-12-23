@@ -75,6 +75,23 @@ export async function askAssistant(userQuery) {
     const assistantMessage = messages.data.find((m) => m.role === "assistant");
     const text = (assistantMessage?.content?.[0]?.text?.value || "").trim();
 
+    // ловим любые типы списков
+    const markers = ["\n1)", "\n1.", "\n•", "\n-", "\n–", "\n—", "\n*"];
+    let listIndex = -1;
+
+    for (const m of markers) {
+      const idx = text.indexOf(m);
+      if (idx !== -1 && (listIndex === -1 || idx < listIndex)) {
+        listIndex = idx;
+      }
+    }
+
+
+    if (listIndex > 0) {
+      // обрезаем всё после заголовка
+      text = text.slice(0, listIndex).trim();
+    }
+
     console.log("🤖 BOT TEXT:", text);
     console.log("🤖 BOT ITEMS:", collectedItems.length);
 
