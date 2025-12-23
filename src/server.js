@@ -71,10 +71,7 @@ app.post("/assistant", async (req, res) => {
 
     console.log("🤖 BOT:", reply);
 
-    res.json({
-      reply: text, // всегда строка
-      items, 
-    });
+    res.json({ reply });
   } catch (err) {
     console.error("Assistant error:", err);
     res.status(500).json({ error: "AI server error" });
