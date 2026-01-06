@@ -75,10 +75,14 @@ export async function askAssistant(userQuery) {
       );
     }
 
-    if (run.status !== "completed") {
-      console.error("❌ Run final status:", run.status);
-      throw new Error("Assistant run did not complete. Final status: " + run.status);
-    }
+   if (run.status !== "completed") {
+  console.error("❌ Run final status:", run.status);
+  console.error("❌ Run last_error:", run.last_error);
+  console.error("❌ Run required_action:", run.required_action);
+  throw new Error(
+    run.last_error?.message || ("Assistant run did not complete. Final status: " + run.status)
+  );
+}
 
     // 4) get assistant message
     const messages = await client.beta.threads.messages.list(thread.id, { limit: 10 });
