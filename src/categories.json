@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "source": "BBAY_CATEGORY_LINKS_WHITELIST",
+  "categories": [
+    {
+      "key": "sport_fitness",
+      "name_am": "Սպորտ և ֆիթնես",
+      "name_ru": "Спорт и фитнес",
+      "name_en": "Sports & Fitness",
+      "url": "https://megahartak.am/shop/biznes-ejer/bbuy/sport-fitnes-sport-ev-fitnes"
+    },
+    {
+      "key": "toys_costumes",
+      "name_am": "Խաղալիքներ և տոնական զգեստներ",
+      "name_ru": "Игрушки и праздничные костюмы",
+      "name_en": "Toys & Party Costumes",
+      "url": "https://megahartak.am/shop/biznes-ejer/bbuy/xaghaliqner-tonakan-zgestner"
+    },
+    {
+      "key": "kitchen_gourmet",
+      "name_am": "Խոհանոց և գուրմե ապրանքներ",
+      "name_ru": "Кухня и гурме товары",
+      "name_en": "Kitchen & Gourmet",
+      "url": "https://megahartak.am/shop/biznes-ejer/bbuy/xohanoc-gowrme-apranqner"
+    },
+    {
+      "key": "original_gifts",
+      "name_am": "Օրիգինալ նվերներ",
+      "name_ru": "Оригинальные подарки",
+      "name_en": "Original Gifts",
+      "url": "https://megahartak.am/shop/biznes-ejer/bbuy/original-nverner-original-nverner"
+    },
+    {
+      "key": "fashion_accessories",
+      "name_am": "Նորաձևություն և աքսեսուարներ",
+      "name_ru": "Мода и аксессуары",
+      "name_en": "Fashion & Accessories",
+      "url": "https://megahartak.am/shop/biznes-ejer/bbuy/norad-owtyown-aqsesowarner"
+    },
+    {
+      "key": "computers_electronics",
+      "name_am": "Համակարգիչներ և էլեկտրոնիկա",
+      "name_ru": "Компьютеры и электроника",
+      "name_en": "Computers & Electronics",
+      "url": "https://megahartak.am/shop/biznes-ejer/bbuy/hamakargichner-elektronika"
+    },
+    {
+      "key": "perfume_cosmetics",
+      "name_am": "Օծանելիք և կոսմետիկա",
+      "name_ru": "Парфюм и косметика",
+      "name_en": "Perfume & Cosmetics",
+      "url": "https://megahartak.am/shop/biznes-ejer/bbuy/ocaneliq-kosmetika"
+    },
+    {
+      "key": "health_beauty",
+      "name_am": "Առողջություն և գեղեցկություն",
+      "name_ru": "Здоровье и красота",
+      "name_en": "Health & Beauty",
+      "url": "https://megahartak.am/shop/biznes-ejer/bbuy/aroghjowtyown-gegheckowtyown"
+    },
+    {
+      "key": "home_garden",
+      "name_am": "Տուն և այգի",
+      "name_ru": "Дом и сад",
+      "name_en": "Home & Garden",
+      "url": "https://megahartak.am/shop/biznes-ejer/bbuy/town-aygi"
+    }
+  ]
+}
