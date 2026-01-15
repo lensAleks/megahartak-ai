@@ -118,7 +118,20 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
 import { searchCatalog } from "./catalog.js";
-import categoriesJson from "./categories.json"
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const categoriesJson = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "categories.json"), "utf-8")
+);
+
+
+console.log("✅ categories.json loaded:", Array.isArray(categoriesJson.categories));
+console.log("✅ categories count:", categoriesJson.categories?.length);
 
 const client = new OpenAI({ apiKey: config.apiKey });
 
