@@ -71,8 +71,13 @@ app.post("/assistant", async (req, res) => {
 
     console.log("🤖 BOT:", reply);
 
-    res.json({ reply });
-  } catch (err) {
+    res.json({ 
+      reply,  
+      items: Array.isArray(reply?.items) ? reply.items : [],
+      category_url: typeof reply?.category_url === "string" ? reply.category_url : null,
+      category_key: typeof reply?.category_key === "string" ? reply.category_key : null,
+      });
+    } catch (err) {
     
     console.error("Assistant error:", err);
     res.status(500).json({ error: "AI server error" });
