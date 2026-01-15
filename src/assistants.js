@@ -118,7 +118,7 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
 import { searchCatalog } from "./catalog.js";
-import categoriesJson from "./categories.json" assert { type: "json" };
+import categoriesJson from "./categories.json"
 
 const client = new OpenAI({ apiKey: config.apiKey });
 
