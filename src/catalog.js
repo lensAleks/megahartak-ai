@@ -7,7 +7,7 @@ const CATALOG_URL = process.env.CATALOG_URL;
 
 let catalogRows = null;
 let loadingPromise = null;
-console.log("📦 Loading catalog from Google Drive...");
+
 
 // Один раз загружаем и держим весь JSON в памяти
 export async function loadCatalogOnce() {
