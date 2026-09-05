@@ -443,17 +443,20 @@ export async function askAssistant(userQuery) {
           const rawResults =
             await searchCatalog(query, limit);
           
-            console.log(
-              "🔍 RAW PRODUCT:",
-              JSON.stringify(rawResults[0], null, 2)
-            );
-            
-          const results = rawResults.map((it) => ({
-            title: it.entry_title || "",
-            price: it.entry_price?.price ?? "",
+           
+
+        const results = rawResults.map((it) => {
+          const photos = String(it.entry_shop_url || "")
+            .split("|")
+            .filter(Boolean);
+
+          return {
+            title: it.entry_price?.price || "",
+            price: it.entry_photo?.photo ?? "",
             url: it.entry_shop_url || "",
-            image: it.entry_photo?.photo || "",
-          }));
+            image: photos[0] || "",
+          };
+        });
 
           collectedItems = results;
 
