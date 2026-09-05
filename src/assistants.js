@@ -1,119 +1,3 @@
-// // src/assistants.js
-// import OpenAI from "openai";
-// import { config } from "./config.js";
-// import { searchCatalog } from "./catalog.js";
-
-// const client = new OpenAI({ apiKey: config.apiKey });
-
-// function safeJsonParse(str, fallback = {}) {
-//   try {
-//     return JSON.parse(str || "{}");
-//   } catch (e) {
-//     console.warn("⚠️ Invalid JSON in tool arguments:", str);
-//     return fallback;
-//   }
-// }
-
-// export async function askAssistant(userQuery) {
-//   try {
-//     let collectedItems = [];
-
-//     // 1) create thread
-//     const thread = await client.beta.threads.create({
-//       messages: [{ role: "user", content: userQuery }],
-//     });
-
-//     // 2) run
-//     let run = await client.beta.threads.runs.createAndPoll(thread.id, {
-//       assistant_id: config.assistantId,
-//     });
-
-//     // 3) handle tools (may require multiple rounds)
-//     while (run.status === "requires_action" && run.required_action?.submit_tool_outputs) {
-//       const toolCalls = run.required_action.submit_tool_outputs.tool_calls;
-//       const toolOutputs = [];
-
-//       for (const call of toolCalls) {
-//         const fname = call.function?.name;
-//         const args = safeJsonParse(call.function?.arguments, {});
-//         console.log("🛠 TOOL CALL:", fname, args);
-
-//         if (fname === "search_catalog") {
-//           const query = args.query || userQuery;
-//           const limit = args.limit ?? 5;
-
-//           console.log("🔎 search_catalog → query:", query, "limit:", limit);
-
-//           const rawResults = await searchCatalog(query, limit);
-
-//           const results = rawResults.map((it) => ({
-//             title: it.entry_title || "",
-//             price: it.entry_price?.price ?? "",
-//             url: it.entry_shop_url || "",
-//             image: it.entry_photo?.photo || "",
-//           }));
-
-//           collectedItems = results;
-
-//           toolOutputs.push({
-//             tool_call_id: call.id,
-//             output: JSON.stringify(results),
-//           });
-//         } else {
-//           // IMPORTANT: always return output for every tool call
-//           toolOutputs.push({
-//             tool_call_id: call.id,
-//             output: JSON.stringify({ error: `Unsupported tool: ${fname}` }),
-//           });
-//         }
-//       }
-
-//       run = await client.beta.threads.runs.submitToolOutputsAndPoll(
-//         thread.id,
-//         run.id,
-//         { tool_outputs: toolOutputs }
-//       );
-//     }
-
-//    if (run.status !== "completed") {
-//   console.error("❌ Run final status:", run.status);
-//   console.error("❌ Run last_error:", run.last_error);
-//   console.error("❌ Run required_action:", run.required_action);
-//   throw new Error(
-//     run.last_error?.message || ("Assistant run did not complete. Final status: " + run.status)
-//   );
-// }
-
-//     // 4) get assistant message
-//     const messages = await client.beta.threads.messages.list(thread.id, { limit: 10 });
-//     const assistantMessage = messages.data.find((m) => m.role === "assistant");
-
-//     let text = (assistantMessage?.content?.[0]?.text?.value || "").trim();
-
-//     // (optional) cut list
-//     const markers = ["\n1)", "\n1.", "\n•", "\n-", "\n–", "\n—", "\n*"];
-//     let listIndex = -1;
-
-//     for (const m of markers) {
-//       const idx = text.indexOf(m);
-//       if (idx !== -1 && (listIndex === -1 || idx < listIndex)) listIndex = idx;
-//     }
-//     if (listIndex > 0) text = text.slice(0, listIndex).trim();
-
-//     console.log("🤖 BOT TEXT:", text);
-//     console.log("🤖 BOT ITEMS:", collectedItems.length);
-
-//     return { text, items: collectedItems };
-//   } catch (err) {
-//     console.error("Assistant error:", err);
-//     throw err;
-//   }
-// }
-
-
-
-
-
 // src/assistants.js
 import OpenAI from "openai";
 import { config } from "./config.js";
@@ -129,34 +13,33 @@ const categoriesJson = JSON.parse(
   fs.readFileSync(path.join(__dirname, "categories.json"), "utf-8")
 );
 
+console.log(
+  "✅ categories.json loaded:",
+  Array.isArray(categoriesJson.categories)
+);
+console.log(
+  "✅ categories count:",
+  categoriesJson.categories?.length
+);
 
-console.log("✅ categories.json loaded:", Array.isArray(categoriesJson.categories));
-console.log("✅ categories count:", categoriesJson.categories?.length);
+const client = new OpenAI({
+  apiKey: config.apiKey,
+});
 
-const client = new OpenAI({ apiKey: config.apiKey });
-
-function safeJsonParse(str, fallback = {}) {
-  try {
-    return JSON.parse(str || "{}");
-  } catch (e) {
-    console.warn("⚠️ Invalid JSON in tool arguments:", str);
-    return fallback;
-  }
-}
-
-/** ----------------------------
- *  CATEGORY WHITELIST MAP
- *  ---------------------------- */
+/**
+ * --------------------------------
+ * CATEGORY WHITELIST
+ * --------------------------------
+ */
 const CATEGORY_URL_BY_KEY = Object.fromEntries(
   (categoriesJson.categories || []).map((c) => [c.key, c.url])
 );
 
-/** ----------------------------
- *  INTENT DETECTION
- *  ---------------------------- */
-
-// 1) Жёсткие маркеры "дай ссылку / category link / բաժին / ..."
-// Если есть — это НЕ поиск товара. Это запрос ссылки на раздел.
+/**
+ * --------------------------------
+ * CATEGORY INTENT
+ * --------------------------------
+ */
 const CATEGORY_LINK_MARKERS = [
   // RU
   "ссылка",
@@ -165,16 +48,19 @@ const CATEGORY_LINK_MARKERS = [
   "категорию",
   "раздел",
   "раздела",
+
   // EN
   "category",
   "link",
   "section",
+
   // AM
   "բաժին",
   "կատեգորիա",
-  // Translit
+
+  // translit
   "bajin",
-  "kategoria"
+  "kategoria",
 ];
 
 function isCategoryLinkRequest(q) {
@@ -182,200 +68,499 @@ function isCategoryLinkRequest(q) {
   return CATEGORY_LINK_MARKERS.some((m) => s.includes(m));
 }
 
-// 2) Простейшая привязка слов → category_key (можно расширять)
-// Важно: это работает ДО ассистента и гарантирует правильный URL.
 const CATEGORY_KEYWORDS_MAP = [
   {
     key: "sport_fitness",
-    kws: ["спорт", "фитнес", "training", "sport", "fitness", "սպորտ", "ֆիթնես", "nike", "adidas", "puma"]
+    kws: [
+      "спорт",
+      "фитнес",
+      "training",
+      "sport",
+      "fitness",
+      "սպորտ",
+      "ֆիթնես",
+      "nike",
+      "adidas",
+      "puma",
+    ],
   },
   {
     key: "toys_costumes",
-    kws: ["игруш", "toys", "lego", "disney", "marvel", "barbie", "խաղալի", "տոնական", "զգեստ"]
+    kws: [
+      "игруш",
+      "toys",
+      "lego",
+      "disney",
+      "marvel",
+      "barbie",
+      "խաղալի",
+      "տոնական",
+      "զգեստ",
+    ],
   },
   {
     key: "kitchen_gourmet",
-    kws: ["кухн", "kitchen", "gourmet", "խոհանոց", "գուրմե", "tefal", "bosch", "philips", "moulinex"]
+    kws: [
+      "кухн",
+      "kitchen",
+      "gourmet",
+      "խոհանոց",
+      "գուրմե",
+      "tefal",
+      "bosch",
+      "philips",
+      "moulinex",
+    ],
   },
   {
     key: "original_gifts",
-    kws: ["подар", "gift", "gifts", "նվեր", "օրիգինալ", "star wars", "playstation"]
+    kws: [
+      "подар",
+      "gift",
+      "gifts",
+      "նվեր",
+      "օրիգինալ",
+      "star wars",
+      "playstation",
+    ],
   },
   {
     key: "fashion_accessories",
-    kws: ["мода", "fashion", "аксесс", "accessories", "նորաձև", "աքսեսուար", "guess", "kors", "hilfiger", "boss"]
+    kws: [
+      "мода",
+      "fashion",
+      "аксесс",
+      "accessories",
+      "նորաձև",
+      "աքսեսուար",
+      "guess",
+      "kors",
+      "hilfiger",
+      "boss",
+    ],
   },
   {
     key: "computers_electronics",
-    kws: ["комп", "ноут", "laptop", "notebook", "pc", "electronics", "համակարգիչ", "նոթբուք", "հեռախոս", "apple", "samsung", "lenovo", "asus", "hp", "sony"]
+    kws: [
+      "комп",
+      "ноут",
+      "laptop",
+      "notebook",
+      "pc",
+      "electronics",
+      "համակարգիչ",
+      "նոթբուք",
+      "հեռախոս",
+      "apple",
+      "samsung",
+      "lenovo",
+      "asus",
+      "hp",
+      "sony",
+    ],
   },
   {
     key: "perfume_cosmetics",
-    kws: ["парф", "духи", "perfume", "cosmetics", "օծանելիք", "կոսմետիկ", "dior", "chanel", "armani", "ysl", "lancome"]
+    kws: [
+      "парф",
+      "духи",
+      "perfume",
+      "cosmetics",
+      "օծանելիք",
+      "կոսմետիկ",
+      "dior",
+      "chanel",
+      "armani",
+      "ysl",
+      "lancome",
+    ],
   },
   {
     key: "health_beauty",
-    kws: ["красот", "здоров", "beauty", "health", "առողջ", "գեղեցկ", "oral-b", "braun", "beurer", "philips"]
+    kws: [
+      "красот",
+      "здоров",
+      "beauty",
+      "health",
+      "առողջ",
+      "գեղեցկ",
+      "oral-b",
+      "braun",
+      "beurer",
+      "philips",
+    ],
   },
   {
     key: "home_garden",
-    kws: ["дом", "сад", "home", "garden", "տուն", "այգի", "bosch", "black+decker", "gardena"]
-  }
+    kws: [
+      "дом",
+      "сад",
+      "home",
+      "garden",
+      "տուն",
+      "այգի",
+      "bosch",
+      "black+decker",
+      "gardena",
+    ],
+  },
 ];
 
 function detectCategoryKey(q) {
   const s = String(q || "").toLowerCase();
 
-  // Если пользователь явно написал "bbay sport category link" — ключ должен быть sport_fitness
-  // Берём лучший матч по количеству совпадений.
-  let best = { key: null, score: 0 };
+  let best = {
+    key: null,
+    score: 0,
+  };
 
   for (const c of CATEGORY_KEYWORDS_MAP) {
     let score = 0;
+
     for (const kw of c.kws) {
-      if (s.includes(String(kw).toLowerCase())) score++;
+      if (s.includes(String(kw).toLowerCase())) {
+        score++;
+      }
     }
-    if (score > best.score) best = { key: c.key, score };
+
+    if (score > best.score) {
+      best = {
+        key: c.key,
+        score,
+      };
+    }
   }
 
   return best.score > 0 ? best.key : null;
 }
 
-/** ----------------------------
- *  MAIN
- *  ---------------------------- */
+/**
+ * --------------------------------
+ * OPENAI TOOLS
+ * --------------------------------
+ */
+const tools = [
+  {
+    type: "file_search",
+
+    // ВАЖНО:
+    // добавим сюда ID твоего старого Vector Store
+    vector_store_ids: [config.vectorStoreId],
+  },
+
+  {
+    type: "function",
+    name: "search_catalog",
+    description:
+      "Search the Megahartak product catalog. Use this when the user wants products, prices, brands, models, or product recommendations.",
+
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "Product search query. Include important brand/model/category words.",
+        },
+
+        limit: {
+          type: "integer",
+          description: "Maximum number of products to return.",
+          minimum: 1,
+          maximum: 10,
+        },
+      },
+
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+];
+
+/**
+ * --------------------------------
+ * INSTRUCTIONS
+ * --------------------------------
+ */
+const instructions = `
+You are "Megahartak AI Assistant", the shopping and customer-support
+assistant for Megahartak.am.
+
+The primary marketplace language is Armenian.
+
+LANGUAGE:
+- If the customer writes Armenian, answer Armenian.
+- If the customer writes Russian, answer Russian.
+- If the customer writes English, answer English.
+- If language is mixed, answer in the dominant language.
+
+YOUR TASKS:
+- Help customers understand Megahartak.
+- Help customers find products.
+- Answer questions about brands, products, delivery, authenticity,
+  returns, warranty and marketplace rules.
+- Use File Search for Megahartak / BBAY knowledge-base questions.
+- Use search_catalog when the customer is looking for actual products,
+  prices, product models or recommendations.
+
+IMPORTANT:
+- Never invent products.
+- Never invent prices.
+- Never invent availability.
+- Never invent delivery conditions.
+- Never claim something is in stock unless the catalog data confirms it.
+- For policies, BBAY, authenticity, delivery, insurance and similar
+  factual questions, rely on the connected knowledge base.
+- If reliable information is not available, tell the customer that it
+  should be confirmed with a Megahartak operator.
+- Do not promise refunds or compensation unless supported by the
+  knowledge base.
+
+PRODUCT SEARCH:
+- When search_catalog returns products, summarize the results naturally.
+- Mention useful product names/features when appropriate.
+- Do not create products that were not returned by the tool.
+- If many products are returned, highlight the best matches.
+- Do not fabricate URLs.
+
+Keep answers clear, useful and suitable for an online marketplace customer.
+`;
+
+/**
+ * --------------------------------
+ * MAIN
+ * --------------------------------
+ */
 export async function askAssistant(userQuery) {
   try {
-    // ✅ 0) CATEGORY LINK REQUEST OVERRIDE (самый важный фикс)
-    // Если пользователь просит "ссылку/категорию/раздел" — НЕ даём ассистенту решать URL.
+    /**
+     * 0. Category URL override
+     *
+     * Keep this logic outside OpenAI.
+     * This guarantees that URLs come only from our whitelist.
+     */
     if (isCategoryLinkRequest(userQuery)) {
       const category_key = detectCategoryKey(userQuery);
 
-      // Если не смогли определить категорию — никаких URL, только текст
       if (!category_key) {
         return {
-          text: "Ссылку на категорию сейчас не могу подобрать точно. Напишите, пожалуйста, какую именно категорию вы хотите (спорт, электроника, кухня, подарки и т.д.).",
+          text:
+            "Ссылку на категорию сейчас не могу подобрать точно. " +
+            "Напишите, пожалуйста, какую именно категорию вы хотите " +
+            "(спорт, электроника, кухня, подарки и т.д.).",
+
           items: [],
           category_key: null,
-          category_url: null
+          category_url: null,
         };
       }
 
-      const category_url = CATEGORY_URL_BY_KEY[category_key] || null;
+      const category_url =
+        CATEGORY_URL_BY_KEY[category_key] || null;
 
-      // Если ключ есть, но URL нет (ошибка в json) — тоже не выдаём URL
       if (!category_url) {
         return {
           text: "Ссылка на категорию временно недоступна.",
           items: [],
           category_key,
-          category_url: null
+          category_url: null,
         };
       }
 
-      // ВАЖНО: URL отдаём только из whitelist
       return {
-        text: "", // фронт может показать только ссылку, или ты можешь вывести её сам
+        text: "",
         items: [],
         category_key,
-        category_url
+        category_url,
       };
     }
 
-    // ✅ 1) otherwise continue normal assistant flow (products / support)
+    /**
+     * 1. First Responses API call
+     */
     let collectedItems = [];
 
-    const thread = await client.beta.threads.create({
-      messages: [{ role: "user", content: userQuery }]
+    let response = await client.responses.create({
+      model: config.model || "gpt-5.6-terra",
+
+      instructions,
+
+      tools,
+
+      input: userQuery,
     });
 
-    let run = await client.beta.threads.runs.createAndPoll(thread.id, {
-      assistant_id: config.assistantId
-    });
+    /**
+     * 2. Function-call loop
+     *
+     * File Search is handled automatically by OpenAI.
+     * Our local search_catalog function must be executed by us.
+     */
+    while (true) {
+      const functionCalls =
+        response.output?.filter(
+          (item) => item.type === "function_call"
+        ) || [];
 
-    while (run.status === "requires_action" && run.required_action?.submit_tool_outputs) {
-      const toolCalls = run.required_action.submit_tool_outputs.tool_calls;
+      if (functionCalls.length === 0) {
+        break;
+      }
+
       const toolOutputs = [];
 
-      for (const call of toolCalls) {
-        const fname = call.function?.name;
-        const args = safeJsonParse(call.function?.arguments, {});
-        console.log("🛠 TOOL CALL:", fname, args);
+      for (const call of functionCalls) {
+        console.log(
+          "🛠 TOOL CALL:",
+          call.name,
+          call.arguments
+        );
 
-        if (fname === "search_catalog") {
-          const query = args.query || userQuery;
-          const limit = args.limit ?? 5;
+        if (call.name === "search_catalog") {
+          let args = {};
 
-          console.log("🔎 search_catalog → query:", query, "limit:", limit);
+          try {
+            args = JSON.parse(call.arguments || "{}");
+          } catch (err) {
+            console.warn(
+              "⚠️ Invalid function arguments:",
+              call.arguments
+            );
+          }
 
-          const rawResults = await searchCatalog(query, limit);
+          const query =
+            args.query || userQuery;
+
+          const limit =
+            Number(args.limit) || 5;
+
+          console.log(
+            "🔎 search_catalog → query:",
+            query,
+            "limit:",
+            limit
+          );
+
+          const rawResults =
+            await searchCatalog(query, limit);
 
           const results = rawResults.map((it) => ({
             title: it.entry_title || "",
             price: it.entry_price?.price ?? "",
             url: it.entry_shop_url || "",
-            image: it.entry_photo?.photo || ""
+            image: it.entry_photo?.photo || "",
           }));
 
           collectedItems = results;
 
-          // ✅ Важно: ассистенту лучше давать объект, а не "голый массив"
           toolOutputs.push({
-            tool_call_id: call.id,
-            output: JSON.stringify({ items: results })
+            type: "function_call_output",
+            call_id: call.call_id,
+            output: JSON.stringify({
+              items: results,
+            }),
           });
         } else {
           toolOutputs.push({
-            tool_call_id: call.id,
-            output: JSON.stringify({ error: `Unsupported tool: ${fname}` })
+            type: "function_call_output",
+            call_id: call.call_id,
+            output: JSON.stringify({
+              error: `Unsupported tool: ${call.name}`,
+            }),
           });
         }
       }
 
-      run = await client.beta.threads.runs.submitToolOutputsAndPoll(thread.id, run.id, {
-        tool_outputs: toolOutputs
+      /**
+       * Continue the same response after our function outputs.
+       */
+      response = await client.responses.create({
+        model: config.model || "gpt-5.6-terra",
+
+        instructions,
+
+        tools,
+
+        previous_response_id: response.id,
+
+        input: toolOutputs,
       });
     }
 
-    if (run.status !== "completed") {
-      console.error("❌ Run final status:", run.status);
-      console.error("❌ Run last_error:", run.last_error);
-      console.error("❌ Run required_action:", run.required_action);
-      throw new Error(
-        run.last_error?.message || "Assistant run did not complete. Final status: " + run.status
-      );
-    }
+    /**
+     * 3. Final text
+     */
+    let text =
+      String(response.output_text || "").trim();
 
-    const messages = await client.beta.threads.messages.list(thread.id, { limit: 10 });
-    const assistantMessage = messages.data.find((m) => m.role === "assistant");
+    console.log("🤖 BOT TEXT:", text);
+    console.log(
+      "🤖 BOT ITEMS:",
+      collectedItems.length
+    );
 
-    let text = (assistantMessage?.content?.[0]?.text?.value || "").trim();
-
-    // ⚠️ Важно: ты раньше резал списки — из-за этого мог “отрезать” важный кусок.
-    // Я бы НЕ резал вообще. Но если хочешь — режь только если items есть.
+    /**
+     * Optional:
+     * If actual products are returned, don't duplicate
+     * a huge product list in the text because the frontend
+     * already renders product cards.
+     */
     if (collectedItems.length > 0) {
-      const markers = ["\n1)", "\n1.", "\n•", "\n-", "\n–", "\n—", "\n*"];
+      const markers = [
+        "\n1)",
+        "\n1.",
+        "\n•",
+        "\n-",
+        "\n–",
+        "\n—",
+        "\n*",
+      ];
+
       let listIndex = -1;
-      for (const m of markers) {
-        const idx = text.indexOf(m);
-        if (idx !== -1 && (listIndex === -1 || idx < listIndex)) listIndex = idx;
+
+      for (const marker of markers) {
+        const idx = text.indexOf(marker);
+
+        if (
+          idx !== -1 &&
+          (listIndex === -1 || idx < listIndex)
+        ) {
+          listIndex = idx;
+        }
       }
-      if (listIndex > 0) text = text.slice(0, listIndex).trim();
+
+      if (listIndex > 0) {
+        text = text.slice(0, listIndex).trim();
+      }
     }
 
-    // ✅ 5) если товаров НЕТ — попробуем предложить категорию (но опять же: URL только из whitelist)
+    /**
+     * 4. Category suggestion when product search returned nothing
+     */
     let category_key = null;
     let category_url = null;
 
     if (collectedItems.length === 0) {
-      category_key = detectCategoryKey(userQuery);
-      category_url = category_key ? (CATEGORY_URL_BY_KEY[category_key] || null) : null;
+      category_key =
+        detectCategoryKey(userQuery);
+
+      category_url =
+        category_key
+          ? CATEGORY_URL_BY_KEY[category_key] || null
+          : null;
     }
 
-    return { text, items: collectedItems, category_key, category_url };
+    return {
+      text,
+      items: collectedItems,
+      category_key,
+      category_url,
+    };
   } catch (err) {
-    console.error("Assistant error:", err);
+    console.error(
+      "❌ Responses API error:",
+      err
+    );
+
     throw err;
   }
 }
-
